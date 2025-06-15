@@ -32,7 +32,9 @@ pub enum Packet
     LoginStart(LoginStartPacket),
     LoginAck(LoginAckPacket),
     LoginPluginResponse,
-    ClientInformation(ClientInformationPackage)
+    ClientInformation(ClientInformationPackage),
+    KnownPacks, //TO-DO PARSE THIS,
+    FinishConfigurationAck
 }
 impl Packet {
     pub fn read_from_bytes(bytes: &[u8], state: &ProtocolState) -> Result<Packet, PacketError> {
@@ -110,6 +112,15 @@ impl Packet {
                     println!("[ + ] RECEIVED CLIENT INFORMATION : {:?} ",client_info_pack);
                     Ok(Packet::ClientInformation(client_info_pack))
                 },
+                7 => {
+                    println!("[ + ] RECEIVED KNOWN PACKS IGNORING FOR NOW");
+                    Ok(Packet::KnownPacks)
+                },
+                3 => {
+                    print!("[ + ] RECEIVED FINISH CONFIGURATION ACK");
+                    Ok(Packet::FinishConfigurationAck)
+                }
+
                 other => Err(PacketError::IdNotSupported(other as u8))
                 
             }
