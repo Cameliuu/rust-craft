@@ -1,7 +1,7 @@
 
 use vintor::{DecodeError,decode,EncodeError};
 
-use crate::{packets::{handhsake::{HandshakeError, HandshakePacket}, status_request::StatusRequest ,ping::PingPacket}, state::state::ProtocolState};
+use crate::{packets::{handhsake::{HandshakeError, HandshakePacket}, login::{LoginAckPacket, LoginStartPacket}, ping::PingPacket, status_request::StatusRequest}, state::state::ProtocolState};
 impl From<DecodeError> for PacketError {
     fn from(err: DecodeError) -> Self {
         PacketError::Decode(err)
@@ -28,9 +28,11 @@ pub enum Packet
 {
     Handshake(HandshakePacket),
     Ping(PingPacket),
-    StatusRequest(StatusRequest)
+    StatusRequest(StatusRequest),
+    LoginStart(LoginStartPacket),
+    LoginAck(LoginAckPacket),
+    LoginPluginResponse
 }
-
 impl Packet {
     pub fn read_from_bytes(bytes: &[u8], state: &ProtocolState) -> Result<Packet, PacketError> {
     if bytes.is_empty() {
@@ -47,8 +49,8 @@ impl Packet {
     }
 
     let packet_data = &bytes[cursor..cursor + packet_length as usize];
-    let (packet_id, id_bytes_read) = decode(packet_data)?;
 
+    let (packet_id, id_bytes_read) = decode(packet_data)?;
     if id_bytes_read > packet_data.len() {
         return Err(PacketError::UnexpectedEOF);
     }
@@ -75,6 +77,30 @@ impl Packet {
             }
             _ => Err(PacketError::IdNotSupported(packet_id as u8)),
         },
+        ProtocolState::Login =>
+        {
+            match packet_id
+            {
+                0 => {
+
+                    let login_packet = LoginStartPacket::from_bytes(payload)?;
+                    Ok(Packet::LoginStart(login_packet))
+                },
+                2 => 
+                {
+                    println!("[ + ] RECEIVED LOGIN PLUGIN RESPONSE. IGNORING FOR NOW");
+                    Ok(Packet::LoginPluginResponse)
+
+                }
+                3 => 
+                {
+                    println!("[ + ] RECEIVED LOGIN ACK");
+                    let login_ack_packet = LoginAckPacket::from_bytes(payload)?;
+                    Ok(Packet::LoginAck(login_ack_packet))
+                },
+                other => Err(PacketError::IdNotSupported(other as u8))
+            }
+        }
 
         // Ignore Login/Play since you're not using them yet
         _ => Err(PacketError::IdNotSupported(packet_id as u8)),

@@ -4,5 +4,6 @@ pub enum ProtocolState
 {
     Handshake,
     Status,
-    Login
+    Login,
+    Play
 }

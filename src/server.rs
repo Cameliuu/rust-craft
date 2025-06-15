@@ -11,9 +11,8 @@ fn send_response(mut stream: &TcpStream, bytes: Vec<u8>)
     stream.flush().expect("[ ! ] FAILED TO FLUSH STREAM");
 
 }
-fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
+fn handle_client(mut stream: TcpStream, state: &mut ProtocolState) -> std::io::Result<()> {
     let mut buffer = [0; 1024];
-    let mut state: ProtocolState = ProtocolState::Handshake;
 
     loop {
         let bytes_read = stream.read(&mut buffer)?;
@@ -23,7 +22,7 @@ fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
         }
 
         let data = &buffer[..bytes_read];
-        let response_bytes=Handler::handle_packet(data,&mut state).expect("[ ! ] ERROR WHILE CREATING RESPONSE BYTES");
+        let response_bytes=Handler::handle_packet(data,state).expect("[ ! ] ERROR WHILE CREATING RESPONSE BYTES"); 
         send_response(&stream, response_bytes);
     }
     Ok(())
@@ -31,7 +30,7 @@ fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
 
 pub fn start(adrr: String) -> std::io::Result<()>
 {
-    
+            
     let listener = TcpListener::bind(adrr)?; 
 
     for incoming_stream in listener.incoming() {
@@ -42,8 +41,11 @@ pub fn start(adrr: String) -> std::io::Result<()>
                 match stream.try_clone()
                 {
                     Ok(cloned_stream) => {
+                        
+    let mut state: ProtocolState = ProtocolState::Handshake;
                         thread::spawn(move || {
-                            handle_client(cloned_stream).expect("[ ! ]  FATAL ERROR");
+
+                            handle_client(cloned_stream,&mut state).expect("[ ! ]  FATAL ERROR");
                         });
 
                     },

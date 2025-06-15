@@ -1,4 +1,5 @@
 use crate::packets::handhsake::HandshakePacket;
+use crate::handlers::login_handler::handle_login;
 use crate::packets::ping::PingPacket;
 use crate::packets::status::{create_response_packet,create_pong_packet};
 use crate::packets::packet::{Packet,PacketError};
@@ -22,6 +23,10 @@ pub fn handle_handshake(handshake_packet: HandshakePacket) -> Result<Vec<u8>,Pac
             println!("[ + ] DETECTED PING REQUEST");
             Ok(create_response_packet()?)
         },
+        2 => {
+            println!("[ + ] DETECTED LOGIN HANDHSAKE");
+            Ok(Vec::new())
+        }
         _ => Err(PacketError::IdNotSupported(handshake_packet.next_state as u8))
         
     }
