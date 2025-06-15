@@ -56,8 +56,15 @@ pub fn handle_packet(data: &[u8], state: &mut ProtocolState) -> Result<Vec<u8>, 
         },
         Packet::LoginPluginResponse =>
         {
-            println!("{:?}",state);
-            Ok(Vec::new())
+            *state = ProtocolState::Configuration;
+            println!("[ + ] STATE UPDATED, now in {:?}", state);
+                Ok(Vec::new())
+        },
+        Packet::ClientInformation(packet) => {
+                
+            *state = ProtocolState::Play;
+            println!("[ + ] STATE UPDATED, now in {:?}", state);
+                Ok(Vec::new())
         }
     }
 }

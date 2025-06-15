@@ -5,5 +5,6 @@ pub enum ProtocolState
     Handshake,
     Status,
     Login,
-    Play
+    Play,
+    Configuration
 }

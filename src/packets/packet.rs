@@ -1,7 +1,7 @@
 
 use vintor::{DecodeError,decode,EncodeError};
 
-use crate::{packets::{handhsake::{HandshakeError, HandshakePacket}, login::{LoginAckPacket, LoginStartPacket}, ping::PingPacket, status_request::StatusRequest}, state::state::ProtocolState};
+use crate::{packets::{handhsake::{HandshakeError, HandshakePacket}, login::{LoginAckPacket, LoginStartPacket}, ping::PingPacket, status_request::StatusRequest ,client_information::ClientInformationPackage}, state::state::ProtocolState};
 impl From<DecodeError> for PacketError {
     fn from(err: DecodeError) -> Self {
         PacketError::Decode(err)
@@ -31,7 +31,8 @@ pub enum Packet
     StatusRequest(StatusRequest),
     LoginStart(LoginStartPacket),
     LoginAck(LoginAckPacket),
-    LoginPluginResponse
+    LoginPluginResponse,
+    ClientInformation(ClientInformationPackage)
 }
 impl Packet {
     pub fn read_from_bytes(bytes: &[u8], state: &ProtocolState) -> Result<Packet, PacketError> {
@@ -99,6 +100,18 @@ impl Packet {
                     Ok(Packet::LoginAck(login_ack_packet))
                 },
                 other => Err(PacketError::IdNotSupported(other as u8))
+            }
+        },
+        ProtocolState::Configuration => {
+            match packet_id {
+                0 => {
+                    let client_info_pack = ClientInformationPackage::from_bytes(payload)?;
+
+                    println!("[ + ] RECEIVED CLIENT INFORMATION : {:?} ",client_info_pack);
+                    Ok(Packet::ClientInformation(client_info_pack))
+                },
+                other => Err(PacketError::IdNotSupported(other as u8))
+                
             }
         }
 
