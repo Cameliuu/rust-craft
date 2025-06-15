@@ -1,27 +1,13 @@
 
-use std::net::{Ipv4Addr, TcpListener, TcpStream};
+use std::net::{TcpListener, TcpStream};
 use std::io::{Write,Read};
 use std::thread;
-use crate::packets::handhsake::HandshakePacket;
-use crate::packets::packet::{self, Packet, PacketError};
-use crate::packets::ping::PingPacket;
-use crate::packets::status::{create_response_packet, create_pong_packet};
-fn handle_ping(ping_packet: PingPacket) -> Result<Vec<u8>,PacketError>
+use crate::handlers::handler::{Handler};
+fn send_response(mut stream: &TcpStream, bytes: Vec<u8>) 
 {
-    println!("[ + ] RECEIVED PING PACKET");
-    Ok(create_pong_packet(ping_packet.total_length,ping_packet.packet_id,ping_packet.bytes)?)
-}
-fn handle_handshake(handshake_packet: HandshakePacket) -> Result<Vec<u8>,PacketError>
-{
-    println!("Received handshake: {:?}",handshake_packet);
-    match handshake_packet.next_state {
-        1 => {
-            println!("[ + ] DETECTED STATUS REQUEST");
-            Ok(create_response_packet()?)
-        },
-        _ => Err(PacketError::IdNotSupported(handshake_packet.next_state as u8))
-        
-    }
+    stream.write_all(&bytes).expect("[ ! ] FAILED TO WRITE RESPONSE BYTES TO STREAM");
+    stream.flush().expect("[ ! ] FAILED TO FLUSH STREAM");
+
 }
 fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
     let mut buffer = [0; 1024];
@@ -34,32 +20,8 @@ fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
         }
 
         let data = &buffer[..bytes_read];
-
-        match Packet::read_from_bytes(data) {
-            Ok(packet) => {
-                match packet {
-                   Packet::Handshake(packet)=> {
-                       let response_bytes = handle_handshake(packet).expect("Failed to handle handshake");
-                       println!("[ + ] SENDING SERVER STATUS RESPONSE");
-
-                        stream.write_all(&response_bytes).expect("Filed to write pong response bytes");
-                       stream.flush().expect("Failed to flush");
-
-                   },
-                   Packet::Ping(packet)=>
-                   {
-                        let response_bytes = handle_ping(packet).expect("Failed to handle ping");
-                        
-                        println!("[ + ] SENDING PONG RESPONSE {:?}", response_bytes);
-                        stream.write_all(&response_bytes).expect("Filed to write pong response bytes");
-                       stream.flush().expect("Failed to flush");
-                   }
-                }
-            }
-            Err(e) => {
-                eprintln!("Failed to parse packet: {:?}", e);
-            }
-        }
+        let response_bytes=Handler::handle_packet(data).expect("[ ! ] ERROR WHILE CREATING RESPONSE BYTES");
+        send_response(&stream, response_bytes);
     }
     Ok(())
 }
@@ -67,7 +29,7 @@ fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
 pub fn start(adrr: String) -> std::io::Result<()>
 {
     
-    let listener = TcpListener::bind("127.0.0.1:25565")?; 
+    let listener = TcpListener::bind(adrr)?; 
 
     for incoming_stream in listener.incoming() {
         println!("[ + ] OPENING NEW CONNECTION");
@@ -78,7 +40,7 @@ pub fn start(adrr: String) -> std::io::Result<()>
                 {
                     Ok(cloned_stream) => {
                         thread::spawn(move || {
-                            handle_client(cloned_stream);
+                            handle_client(cloned_stream).expect("[ ! ]  FATAL ERROR");
                         });
 
                     },
