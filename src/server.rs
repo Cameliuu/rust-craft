@@ -3,6 +3,8 @@ use std::net::{TcpListener, TcpStream};
 use std::io::{Write,Read};
 use std::thread;
 use crate::handlers::handler::{Handler};
+use crate::state::state::ProtocolState;
+
 fn send_response(mut stream: &TcpStream, bytes: Vec<u8>) 
 {
     stream.write_all(&bytes).expect("[ ! ] FAILED TO WRITE RESPONSE BYTES TO STREAM");
@@ -11,6 +13,7 @@ fn send_response(mut stream: &TcpStream, bytes: Vec<u8>)
 }
 fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
     let mut buffer = [0; 1024];
+    let mut state: ProtocolState = ProtocolState::Handshake;
 
     loop {
         let bytes_read = stream.read(&mut buffer)?;
@@ -20,7 +23,7 @@ fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
         }
 
         let data = &buffer[..bytes_read];
-        let response_bytes=Handler::handle_packet(data).expect("[ ! ] ERROR WHILE CREATING RESPONSE BYTES");
+        let response_bytes=Handler::handle_packet(data,&mut state).expect("[ ! ] ERROR WHILE CREATING RESPONSE BYTES");
         send_response(&stream, response_bytes);
     }
     Ok(())
