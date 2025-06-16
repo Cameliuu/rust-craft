@@ -18,6 +18,7 @@ impl Handler {
         let packet = Packet::read_from_bytes(data, state)?;
         match packet {
             Packet::Handshake(packet) => {
+                println!("[ + ] RECEIVED HANDHSAKE PACKET {:?}",packet);
                 *state = match packet.next_state {
                     1 => ProtocolState::Status,
                     2 => {

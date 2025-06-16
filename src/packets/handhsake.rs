@@ -1,6 +1,6 @@
 use vintor::{decode,DecodeError};
 
-use crate::packets::packet::PacketError;
+use crate::packets::packet::{PacketError,PacketReadable};
 
 #[derive(Debug)]
 pub struct HandshakePacket{
@@ -9,6 +9,23 @@ pub struct HandshakePacket{
     pub server_port: u16,
     pub next_state: i32
 
+}
+impl PacketReadable for HandshakePacket
+{
+    fn read(reader: &mut super::packet_reader::PacketReader) -> Result<Self, PacketError> {
+    let protocol_version = reader.read_i32()?;
+    let server_address = reader.read_string()?;
+    let port_bytes = reader.read_bytes(2)?;  
+    let server_port = u16::from_be_bytes([port_bytes[0], port_bytes[1]]);
+    let next_state = reader.read_i32()?;
+
+    Ok(HandshakePacket {
+        protocol_version,
+        server_address,
+        server_port,
+        next_state,
+    })
+}
 }
 impl From<DecodeError> for HandshakeError
 {
@@ -27,7 +44,7 @@ impl From<HandshakeError> for PacketError
 #[derive(Debug)]
 pub enum HandshakeError
 {
-    Decode(DecodeError)
+    Decode(DecodeError),
 }
 impl HandshakePacket {
     pub fn from_bytes(bytes: &[u8]) -> Result<HandshakePacket,PacketError>
