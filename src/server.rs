@@ -3,13 +3,16 @@ use std::net::{TcpListener, TcpStream};
 use std::io::{Write,Read};
 use std::thread;
 use crate::handlers::handler::{Handler};
-fn send_response(mut stream: &TcpStream, bytes: Vec<u8>) 
+use crate::state::state::ProtocolState;
+
+fn send_response(mut stream: &TcpStream, bytes: &[u8]) -> std::io::Result<()>
 {
     stream.write_all(&bytes).expect("[ ! ] FAILED TO WRITE RESPONSE BYTES TO STREAM");
     stream.flush().expect("[ ! ] FAILED TO FLUSH STREAM");
-
+    Ok(())
 }
-fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
+
+fn handle_client(mut stream: TcpStream, state: &mut ProtocolState) -> std::io::Result<()> {
     let mut buffer = [0; 1024];
 
     loop {
@@ -20,15 +23,27 @@ fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
         }
 
         let data = &buffer[..bytes_read];
-        let response_bytes=Handler::handle_packet(data).expect("[ ! ] ERROR WHILE CREATING RESPONSE BYTES");
-        send_response(&stream, response_bytes);
+        
+        let response_packets = match Handler::handle_packet(data, state) {
+            Ok(packets) => packets,
+            Err(e) => {
+                eprintln!("[ ! ] ERROR WHILE CREATING RESPONSE BYTES: {:?}", e);
+                break;
+            }
+        };
+
+        for packet_bytes in response_packets {
+             send_response(&mut stream, &packet_bytes)?;
+        }
     }
+
     Ok(())
 }
 
+
 pub fn start(adrr: String) -> std::io::Result<()>
 {
-    
+            
     let listener = TcpListener::bind(adrr)?; 
 
     for incoming_stream in listener.incoming() {
@@ -39,8 +54,11 @@ pub fn start(adrr: String) -> std::io::Result<()>
                 match stream.try_clone()
                 {
                     Ok(cloned_stream) => {
+                        
+    let mut state: ProtocolState = ProtocolState::Handshake;
                         thread::spawn(move || {
-                            handle_client(cloned_stream).expect("[ ! ]  FATAL ERROR");
+
+                            handle_client(cloned_stream,&mut state).expect("[ ! ]  FATAL ERROR");
                         });
 
                     },
