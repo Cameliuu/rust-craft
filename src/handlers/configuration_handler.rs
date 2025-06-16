@@ -1,7 +1,49 @@
 use crate::packets::packet::PacketError;
-use crate::utils::utils::extend_with_string;
+use crate::utils::utils::{extend_with_string,load_registries_from_file};
 use vintor::{encode, EncodeError};
 
+
+
+pub fn create_registry_packs_from_file() -> Result<Vec<Vec<u8>>, PacketError> {
+    let file_path = "registries-data.json";
+    let mut packets = Vec::new();
+
+    match load_registries_from_file(file_path) {
+        Ok(registry_file) => {
+            for (registry_name, entities) in registry_file.0 {
+                println!("Registry: {}", registry_name);
+
+                let mut inner = Vec::new();
+
+                let packet_id = encode(7)?;
+                inner.extend(packet_id);
+
+                extend_with_string(&mut inner, registry_name)?;
+
+                let array_len = encode(entities.len() as i32)?;
+                inner.extend(array_len);
+
+                for entity_name in entities.keys() {
+                    println!("  - {}", entity_name);
+                    extend_with_entity(&mut inner, entity_name.to_string())?;
+                }
+
+                let mut packet = Vec::new();
+                let inner_len = encode(inner.len() as i32)?;
+                packet.extend(inner_len);
+                packet.extend(inner);
+
+                packets.push(packet);
+            }
+
+            Ok(packets)
+        }
+        Err(err) => {
+            eprintln!("Failed to load registries: {}", err);
+            Err(PacketError::RegistryLoadFailed)
+        }
+    }
+}
 
 pub fn create_known_packs_response() -> Result<Vec<u8>,PacketError>
 {
@@ -154,14 +196,16 @@ pub fn create_damage_type_variant_registry_data_packet() -> Result<Vec<u8>, Pack
     let packet_id = encode(7)?;
     inner.extend(packet_id);
     let registry = String::from("minecraft:damage_type");
-    let entities : [String;4] = [String::from("minecraft:fall"),
+    let entities : [String;5] = [String::from("minecraft:fall"),
                                 String::from("minecraft:arrow"),
                                 String::from("minecraft:generic"),
-                                String::from("minecraft:mob_attack")];
+                                String::from("minecraft:mob_attack"),
+                                String::from("minecraft:in_fire")
+                                 ];
 
     extend_with_string(&mut inner, registry)?;
 
-    let array_len = encode(4)?;
+    let array_len = encode(entities.len() as i32)?;
     inner.extend(array_len);
     
     for ent in entities
@@ -333,6 +377,67 @@ pub fn create_wolf_sound_variant_registry_data_packet() -> Result<Vec<u8>, Packe
     let inner_len = encode(inner.len() as i32)?;
     response.extend(inner_len);
     response.extend(inner);
+    Ok(response)
+}
+pub fn create_join_game_packet() -> Result<Vec<u8>, PacketError> {
+    let mut response = Vec::new();
+    let mut inner = Vec::new();
+
+    // Packet ID (0x2B)
+    let packet_id = encode(0x2B)?;
+    inner.extend(packet_id);
+
+    // Fields
+    inner.extend(&4i32.to_be_bytes()); // Entity ID (dummy)
+    inner.push(0); // Is Hardcore = false
+
+    // Dimension Names (Array of Identifiers)
+    let dimension_names = vec![
+        String::from("minecraft:overworld"),
+        String::from("minecraft:the_nether"),
+        String::from("minecraft:the_end"),
+    ];
+    let dimension_names_len = encode(dimension_names.len() as i32)?;
+    inner.extend(dimension_names_len);
+    for dim in dimension_names {
+        extend_with_string(&mut inner, dim)?;
+    }
+
+    inner.extend(encode(100)?); // Max Players (unused)
+    inner.extend(encode(10)?);  // View Distance
+    inner.extend(encode(5)?);   // Simulation Distance
+
+    inner.push(0); // Reduced Debug Info = false
+    inner.push(1); // Enable Respawn Screen = true
+    inner.push(0); // Do Limited Crafting = false
+
+    inner.extend(encode(0)?); // Dimension Type ID (index into registry)
+    extend_with_string(&mut inner, "minecraft:overworld".to_string())?; // Dimension Name
+    inner.extend(123456789i64.to_be_bytes()); // Hashed Seed (dummy)
+
+    inner.push(0); // Game Mode = Survival
+    inner.push(-1i8 as u8); // Previous Game Mode = -1 (undefined)
+
+    inner.push(0); // Is Debug = false
+    inner.push(0); // Is Flat = false
+
+    // Has Death Location = false (so no death dimension/location)
+    inner.push(0);
+
+    // Portal Cooldown
+    inner.extend(encode(0)?);
+
+    // Sea Level
+    inner.extend(encode(63)?);
+
+    // Enforces Secure Chat
+    inner.push(0); // false
+
+    // Wrap full packet
+    let packet_len = encode(inner.len() as i32)?;
+    response.extend(packet_len);
+    response.extend(inner);
+
     Ok(response)
 }
 

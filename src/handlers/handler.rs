@@ -3,7 +3,7 @@ use std::net::TcpStream;
 use crate::handlers::login_handler::handle_login;
 use crate::packets::packet::{Packet,PacketError};
 use crate::handlers::handshake_handler::{handle_handshake,handle_status,handle_ping};
-use crate::handlers::configuration_handler::{create_biomes_registry_data_packet, create_cat_variant_registry_data_packet, create_chicken_variant_registry_data_packet, create_cow_variant_registry_data_packet, create_damage_type_variant_registry_data_packet, create_dimensions_type_registry_data_packet, create_finish_configuration_packet, create_frog_variant_registry_data_packet, create_known_packs_response, create_painting_variant_registry_data_packet, create_pig_variant_registry_data_packet, create_wolf_sound_variant_registry_data_packet, create_wolf_variant_registry_data_packet};
+use crate::handlers::configuration_handler::{create_biomes_registry_data_packet, create_cat_variant_registry_data_packet, create_chicken_variant_registry_data_packet, create_cow_variant_registry_data_packet, create_damage_type_variant_registry_data_packet, create_dimensions_type_registry_data_packet, create_finish_configuration_packet, create_frog_variant_registry_data_packet, create_join_game_packet, create_known_packs_response, create_painting_variant_registry_data_packet, create_pig_variant_registry_data_packet, create_wolf_sound_variant_registry_data_packet, create_wolf_variant_registry_data_packet, create_registry_packs_from_file};
 use crate::state::state::ProtocolState;
 #[derive(Debug)]
 pub struct Handler
@@ -22,8 +22,7 @@ impl Handler {
                     1 => ProtocolState::Status,
                     2 => {
                         println!("[ ! ] Login requested");
-                        ProtocolState::Login
-                    },
+                        ProtocolState::Login },
                     other => return Err(PacketError::IdNotSupported(other as u8)),
                 };
 
@@ -69,12 +68,17 @@ impl Handler {
             Packet::KnownPacks => {
                 println!("[ + ] CREATING REGISTRY DATA PACKETS");
 
+                
                 let mut packets = Vec::new();
+                /*
                 packets.push(create_biomes_registry_data_packet()?);
                 packets.push(create_dimensions_type_registry_data_packet()?);
                 packets.push(create_painting_variant_registry_data_packet()?);
                 packets.push(create_wolf_variant_registry_data_packet()?);
                 packets.push(create_damage_type_variant_registry_data_packet()?);
+                */
+                let registry_packets = create_registry_packs_from_file()?;
+                packets = registry_packets;
                 packets.push(create_cat_variant_registry_data_packet()?);
                 packets.push(create_wolf_sound_variant_registry_data_packet()?);
                 packets.push(create_chicken_variant_registry_data_packet()?);
@@ -90,8 +94,13 @@ impl Handler {
 
                 *state = ProtocolState::Play;
                 println!("[ + ] STATE UPDATED, now in {:?}", state);
-                Ok(vec![]) // no response packet here
-        }
+                let response_bytes = create_join_game_packet()?;
+
+                Ok(vec![response_bytes])
+         },
+         Packet::ClientTickEnd => {
+             Ok(Vec::new())
+         }
         }
     }
 }

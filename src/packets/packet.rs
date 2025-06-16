@@ -1,4 +1,6 @@
 
+use std::f64::consts::E;
+
 use vintor::{DecodeError,decode,EncodeError};
 
 use crate::{packets::{handhsake::{HandshakeError, HandshakePacket}, login::{LoginAckPacket, LoginStartPacket}, ping::PingPacket, status_request::StatusRequest ,client_information::ClientInformationPackage}, state::state::ProtocolState};
@@ -21,7 +23,8 @@ pub enum PacketError
     InvalidUtf8,
     Handshake(HandshakeError),
     UnexpectedEOF,
-    Encode(EncodeError)
+    Encode(EncodeError),
+    RegistryLoadFailed
 }
 #[derive(Debug)]
 pub enum Packet
@@ -34,7 +37,8 @@ pub enum Packet
     LoginPluginResponse,
     ClientInformation(ClientInformationPackage),
     KnownPacks, //TO-DO PARSE THIS,
-    FinishConfigurationAck
+    FinishConfigurationAck,
+    ClientTickEnd
 }
 impl Packet {
     pub fn read_from_bytes(bytes: &[u8], state: &ProtocolState) -> Result<Packet, PacketError> {
@@ -123,6 +127,15 @@ impl Packet {
 
                 other => Err(PacketError::IdNotSupported(other as u8))
                 
+            }
+        },
+        ProtocolState::Play => {
+            match packet_id {
+               11 => {
+                   println!("[ + ] RECEIVED CLIENT TICK END PACKET");
+                   Ok(Packet::ClientTickEnd)
+               }
+               other => Err(PacketError::IdNotSupported(other as u8))
             }
         }
 
